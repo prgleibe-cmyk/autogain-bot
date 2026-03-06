@@ -25,6 +25,10 @@ const io = new Server(httpServer, {
 app.use(cors());
 app.use(express.json());
 
+// Servir arquivos estáticos do frontend (Vite build)
+const distPath = path.join(__dirname, "dist");
+app.use(express.static(distPath));
+
 let pythonProcess = null;
 let pendingRequests = new Map();
 let stdoutBuffer = "";
@@ -43,8 +47,30 @@ function startPython() {
   });
   pendingRequests.clear();
 
-  console.log(`[Server] Iniciando Bridge Python em: ${bridgePath}`);
-  pythonProcess = spawn("python", [bridgePath]);
+  console.log(`[Server] Tentando iniciar Bridge Python em: ${bridgePath}`);
+  
+  // Tenta python3, se falhar tenta python
+  try {
+    pythonProcess = spawn("python3", [bridgePath]);
+    
+    pythonProcess.on("error", (err) => {
+      if (err.code === 'ENOENT') {
+        console.log("[Server] python3 não encontrado, tentando 'python'...");
+        pythonProcess = spawn("python", [bridgePath]);
+        setupPythonListeners();
+      } else {
+        console.error("[Python-Process-Fatal Error]", err);
+      }
+    });
+
+    setupPythonListeners();
+  } catch (e) {
+    console.error("[Server] Erro crítico ao tentar iniciar Python:", e.message);
+  }
+}
+
+function setupPythonListeners() {
+  if (!pythonProcess) return;
 
   pythonProcess.stdout.on("data", (data) => {
     stdoutBuffer += data.toString();
@@ -53,22 +79,15 @@ function startPython() {
 
     for (const line of lines) {
       if (!line.trim()) continue;
-
       try {
         const msg = JSON.parse(line);
-
-        // Se for uma resposta a um request pendente
         if (msg.request_id && pendingRequests.has(msg.request_id)) {
           const { resolve, timeout } = pendingRequests.get(msg.request_id);
           clearTimeout(timeout);
           pendingRequests.delete(msg.request_id);
           resolve(msg);
         } 
-        
-        // SEMPRE broadcast para o frontend (para atualizar trades em tempo real)
-        // O frontend filtra o que interessa (ORDER_RESULT, etc)
         io.emit("stats_update", msg);
-        
       } catch (e) {
         console.log("[Python Log]", line);
       }
@@ -79,14 +98,10 @@ function startPython() {
     console.error("[Python-Error]", data.toString());
   });
 
-  pythonProcess.on("error", (err) => {
-    console.error("[Python-Process-Fatal]", err);
-  });
-
   pythonProcess.on("close", (code) => {
-    console.log(`[Python] Encerrado (Code: ${code}). Reiniciando em 2s...`);
+    console.log(`[Python] Encerrado (Code: ${code}). Reiniciando em 5s...`);
     pythonProcess = null;
-    setTimeout(startPython, 2000);
+    setTimeout(startPython, 5000);
   });
 }
 
@@ -243,6 +258,20 @@ io.on("connection", (socket) => {
   });
 });
 
-httpServer.listen(5000, () => {
-  console.log("🚀 Backend Express + Socket.IO rodando em http://localhost:5000");
+// Rota curinga para o SPA (Single Page Application)
+app.get("*", (req, res) => {
+  const indexPath = path.join(__dirname, "dist", "index.html");
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      console.error("[Server] Erro ao enviar index.html. O build foi feito? Caminho:", indexPath);
+      res.status(500).send("Erro interno: O frontend não foi construído corretamente. Verifique os logs do servidor.");
+    }
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Servidor rodando em http://0.0.0.0:${PORT}`);
+  console.log(`[Server] NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`[Server] Servindo arquivos de: ${distPath}`);
 });
