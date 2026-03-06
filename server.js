@@ -39,6 +39,7 @@ let stdoutBuffer = "";
 
 function startPython() {
   const bridgePath = path.join(__dirname, "backend", "bridge.py");
+  const venvPython = path.join(__dirname, "venv", "bin", "python3");
 
   stdoutBuffer = "";
   pendingRequests.forEach(({ timeout, reject }) => {
@@ -50,18 +51,17 @@ function startPython() {
   console.log(`[Server] Tentando iniciar Bridge Python em: ${bridgePath}`);
   
   try {
-    // Tenta python3 globalmente
-    console.log("[Server] Iniciando com python3...");
-    pythonProcess = spawn("python3", [bridgePath]);
+    // Tenta o python do ambiente virtual primeiro
+    if (require('fs').existsSync(venvPython)) {
+      console.log(`[Server] Iniciando com VENV: ${venvPython}`);
+      pythonProcess = spawn(venvPython, [bridgePath]);
+    } else {
+      console.log("[Server] VENV não encontrado em " + venvPython + ", tentando python3 global...");
+      pythonProcess = spawn("python3", [bridgePath]);
+    }
     
     pythonProcess.on("error", (err) => {
-      if (err.code === 'ENOENT') {
-        console.log("[Server] python3 não encontrado, tentando 'python'...");
-        pythonProcess = spawn("python", [bridgePath]);
-        setupPythonListeners();
-      } else {
-        console.error("[Python-Process-Fatal Error]", err);
-      }
+      console.error("[Python-Process-Fatal Error]", err);
     });
 
     setupPythonListeners();
