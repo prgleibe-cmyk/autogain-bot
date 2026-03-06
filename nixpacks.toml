@@ -4,16 +4,16 @@ nixPkgs = ["nodePackages.npm", "python3", "python3Packages.pip", "gcc", "gnumake
 [phases.install]
 cmds = [
     "npm install",
-    "python3 -m pip install --upgrade pip",
-    "mkdir -p /app/backend/python_lib",
-    "python3 -m pip install --no-cache-dir --target /app/backend/python_lib -r requirements.txt"
+    "python3 -m pip install --upgrade pip setuptools wheel",
+    "mkdir -p ./backend/python_lib",
+    "python3 -m pip install --no-cache-dir --target ./backend/python_lib -r requirements.txt"
 ]
 
 [phases.build]
 cmds = [
     "npm run build",
-    "ls -la /app/backend/python_lib",
-    "PYTHONPATH=/app/backend/python_lib python3 -c 'import urllib3; print(\"Lib Verified\")'"
+    "ls -R ./backend/python_lib | head -n 20",
+    "PYTHONPATH=./backend/python_lib python3 -c 'import urllib3; import iqoptionapi; print(\"Dependencies Verified Successfully\")'"
 ]
 
 [start]

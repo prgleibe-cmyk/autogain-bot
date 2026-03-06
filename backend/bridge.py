@@ -7,10 +7,18 @@ _lib_path = os.path.join(_current_dir, 'python_lib')
 if _lib_path not in sys.path:
     sys.path.insert(0, _lib_path)
 
-import json
-import threading
-import warnings
-import urllib3
+try:
+    import json
+    import threading
+    import warnings
+    import urllib3
+except ImportError as e:
+    sys.stderr.write(f"ERRO DE IMPORTACAO: {e}\n")
+    sys.stderr.write(f"PYTHONPATH: {os.environ.get('PYTHONPATH')}\n")
+    sys.stderr.write(f"sys.path: {sys.path}\n")
+    sys.stderr.write(f"Conteudo de {_lib_path}: {os.listdir(_lib_path) if os.path.exists(_lib_path) else 'NAO EXISTE'}\n")
+    sys.stderr.flush()
+    sys.exit(1)
 
 # Redirecionamento de logs para não quebrar o JSON
 _real_stdout = sys.stdout

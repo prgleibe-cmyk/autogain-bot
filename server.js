@@ -52,7 +52,12 @@ function startPython() {
   
   try {
     console.log("[Server] Iniciando com python3 global...");
-    pythonProcess = spawn("python3", [bridgePath]);
+    const pythonEnv = {
+      ...process.env,
+      PYTHONPATH: path.join(__dirname, "backend", "python_lib"),
+      PYTHONUNBUFFERED: "1"
+    };
+    pythonProcess = spawn("python3", [bridgePath], { env: pythonEnv });
     
     pythonProcess.on("error", (err) => {
       console.error("[Python-Process-Fatal Error]", err);
