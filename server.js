@@ -56,6 +56,14 @@ function startPython() {
     
     pythonProcess.on("error", (err) => {
       console.error("[Python-Process-Fatal Error]", err);
+      try {
+        const libPath = path.join(__dirname, "backend", "python_lib");
+        if (fs.existsSync(libPath)) {
+          console.log("[Server] Conteúdo de python_lib:", fs.readdirSync(libPath).slice(0, 10).join(", "));
+        } else {
+          console.log("[Server] AVISO: Pasta python_lib não encontrada!");
+        }
+      } catch (e) {}
     });
 
     setupPythonListeners();
