@@ -41,22 +41,6 @@ let stdoutBuffer = "";
 function startPython() {
   const bridgePath = path.join(__dirname, "backend", "bridge.py");
   
-  // Lista de possíveis caminhos para o executável do Python no VENV
-  const possiblePaths = [
-    path.join(__dirname, "venv", "bin", "python3"),
-    path.join(__dirname, "venv", "bin", "python"),
-    "/app/venv/bin/python3",
-    "/app/venv/bin/python"
-  ];
-
-  let venvPython = null;
-  for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
-      venvPython = p;
-      break;
-    }
-  }
-
   stdoutBuffer = "";
   pendingRequests.forEach(({ timeout, reject }) => {
     clearTimeout(timeout);
@@ -67,19 +51,8 @@ function startPython() {
   console.log(`[Server] Tentando iniciar Bridge Python em: ${bridgePath}`);
   
   try {
-    if (venvPython) {
-      console.log(`[Server] Iniciando com VENV detectado: ${venvPython}`);
-      pythonProcess = spawn(venvPython, [bridgePath]);
-    } else {
-      console.log("[Server] AVISO: Nenhum VENV encontrado nos caminhos testados.");
-      try {
-        const rootFiles = fs.readdirSync(__dirname);
-        console.log("[Server] Conteúdo de " + __dirname + ": " + rootFiles.join(", "));
-      } catch (e) {}
-      
-      console.log("[Server] Tentando fallback para python3 global...");
-      pythonProcess = spawn("python3", [bridgePath]);
-    }
+    console.log("[Server] Iniciando com python3 global...");
+    pythonProcess = spawn("python3", [bridgePath]);
     
     pythonProcess.on("error", (err) => {
       console.error("[Python-Process-Fatal Error]", err);

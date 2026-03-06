@@ -4,15 +4,14 @@ nixPkgs = ["nodePackages.npm", "python3", "python3Packages.pip", "gcc", "gnumake
 [phases.install]
 cmds = [
     "npm install",
-    "python3 -m venv /app/venv",
-    "/app/venv/bin/pip install --upgrade pip",
-    "/app/venv/bin/pip install --no-cache-dir -r requirements.txt"
+    "python3 -m pip install --upgrade pip",
+    "python3 -m pip install --no-cache-dir --target ./backend/python_lib -r requirements.txt"
 ]
 
 [phases.build]
 cmds = [
     "npm run build",
-    "/app/venv/bin/python3 -c 'import urllib3; print(\"VENV Verified\")'"
+    "PYTHONPATH=./backend/python_lib python3 -c 'import urllib3; print(\"Lib Verified\")'"
 ]
 
 [start]

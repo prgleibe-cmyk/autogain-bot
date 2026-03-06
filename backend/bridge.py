@@ -1,8 +1,15 @@
 import sys
+import os
 import json
 import threading
 import warnings
 import urllib3
+
+# Adiciona o diretório de pacotes ao path
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_lib_path = os.path.join(_current_dir, 'python_lib')
+if _lib_path not in sys.path:
+    sys.path.insert(0, _lib_path)
 
 # Redirecionamento de logs para não quebrar o JSON
 _real_stdout = sys.stdout
