@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { spawn } from "child_process";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { Server } from "socket.io";
 import { createServer } from "http";
@@ -52,7 +53,7 @@ function startPython() {
   
   try {
     // Tenta o python do ambiente virtual primeiro
-    if (require('fs').existsSync(venvPython)) {
+    if (fs.existsSync(venvPython)) {
       console.log(`[Server] Iniciando com VENV: ${venvPython}`);
       pythonProcess = spawn(venvPython, [bridgePath]);
     } else {
