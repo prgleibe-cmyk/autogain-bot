@@ -54,7 +54,7 @@ function startPython() {
     console.log("[Server] Iniciando com python3 global...");
     const pythonEnv = {
       ...process.env,
-      PYTHONPATH: path.join(__dirname, "backend", "python_lib"),
+      PYTHONPATH: "/python_libs",
       PYTHONUNBUFFERED: "1"
     };
     pythonProcess = spawn("python3", [bridgePath], { env: pythonEnv });

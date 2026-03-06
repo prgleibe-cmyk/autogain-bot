@@ -2,8 +2,7 @@ import sys
 import os
 
 # Adiciona o diretório de pacotes ao path ANTES de importar qualquer lib externa
-_current_dir = os.path.dirname(os.path.abspath(__file__))
-_lib_path = os.path.join(_current_dir, 'python_lib')
+_lib_path = '/python_libs'
 if _lib_path not in sys.path:
     sys.path.insert(0, _lib_path)
 
