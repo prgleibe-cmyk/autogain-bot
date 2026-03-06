@@ -149,33 +149,35 @@ const App: React.FC = () => {
     handleLoginSuccess, handleLogout, handleSettingsUpdate 
   } = useAuth();
 
-  if (!isAuthenticated) return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
-  
-  if (userRole === 'ADMIN' && showAdminPanel) {
-    return (
-       <AdminDashboard 
+  return (
+    <div key={isAuthenticated ? 'app-authenticated' : 'app-guest'} className="min-h-screen bg-[#020617]">
+      {!isAuthenticated ? (
+        <LoginScreen key="login-screen" onLoginSuccess={handleLoginSuccess} />
+      ) : userRole === 'ADMIN' && showAdminPanel ? (
+        <AdminDashboard 
+          key="admin-dashboard"
           onLogout={handleLogout} 
           onUpdateSettings={handleSettingsUpdate}
           onBackToSystem={() => setShowAdminPanel(false)}
-       />
-    );
-  }
-
-  return (
-      <BotProvider 
-          userEmail={userEmail} 
-          isAuthenticated={isAuthenticated} 
-          systemSettings={systemSettings}
-          onUpdateSettings={handleSettingsUpdate}
-      >
-          <DashboardLayout 
-             isTrialMode={isTrialMode}
-             daysRemaining={daysRemaining}
-             handleLogout={handleLogout}
-             isAdmin={userRole === 'ADMIN'}
-             setShowAdminPanel={setShowAdminPanel}
-          />
-      </BotProvider>
+        />
+      ) : (
+        <BotProvider 
+            key="bot-provider"
+            userEmail={userEmail} 
+            isAuthenticated={isAuthenticated} 
+            systemSettings={systemSettings}
+            onUpdateSettings={handleSettingsUpdate}
+        >
+            <DashboardLayout 
+               isTrialMode={isTrialMode}
+               daysRemaining={daysRemaining}
+               handleLogout={handleLogout}
+               isAdmin={userRole === 'ADMIN'}
+               setShowAdminPanel={setShowAdminPanel}
+            />
+        </BotProvider>
+      )}
+    </div>
   );
 };
 
