@@ -1,0 +1,5 @@
+{
+  "name": "AutoGain",
+  "description": "AutoGain é um bot de trading automatizado de alto desempenho para IQ Option. Utiliza a API Gemini para análise de tendências de mercado e gerenciamento avançado de banca (Martingale, Soros). Interface profissional com gráficos em tempo real.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,6 @@
+Flask==3.0.0
+flask-cors==4.0.0
+requests==2.31.0
+websocket-client==1.6.1
+# Versão Stable do wrapper IQ Option (Fork Mantido)
+https://github.com/Lu-Yi-Hsun/iqoptionapi/archive/refs/heads/master.zip
