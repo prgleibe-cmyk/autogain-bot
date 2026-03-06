@@ -49,20 +49,13 @@ function startPython() {
 
   console.log(`[Server] Tentando iniciar Bridge Python em: ${bridgePath}`);
   
-  // Tenta o python do ambiente virtual primeiro, depois python3, depois python
-  const venvPython = path.join(__dirname, ".venv", "bin", "python");
-  
   try {
-    if (require('fs').existsSync(venvPython)) {
-      console.log(`[Server] Usando Python do VENV: ${venvPython}`);
-      pythonProcess = spawn(venvPython, [bridgePath]);
-    } else {
-      console.log("[Server] VENV não encontrado, tentando python3 global...");
-      pythonProcess = spawn("python3", [bridgePath]);
-    }
+    // Tenta python3 globalmente
+    console.log("[Server] Iniciando com python3...");
+    pythonProcess = spawn("python3", [bridgePath]);
     
     pythonProcess.on("error", (err) => {
-      if (err.code === 'ENOENT' && !venvPython) {
+      if (err.code === 'ENOENT') {
         console.log("[Server] python3 não encontrado, tentando 'python'...");
         pythonProcess = spawn("python", [bridgePath]);
         setupPythonListeners();
@@ -122,7 +115,8 @@ startPython();
 function sendToPython(command) {
   return new Promise((resolve, reject) => {
     if (!pythonProcess || !pythonProcess.stdin || pythonProcess.killed) {
-      return reject(new Error("Conexão com motor Python perdida."));
+      const status = !pythonProcess ? "null" : (pythonProcess.killed ? "killed" : "no-stdin");
+      return reject(new Error(`O motor do robô (Python) não está respondendo (Status: ${status}). Verifique os logs do servidor no Coolify.`));
     }
 
     const request_id =
