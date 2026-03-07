@@ -52,23 +52,10 @@ function startPython() {
   
   try {
     console.log("[Server] Iniciando com python3 global...");
-    const pythonEnv = {
-      ...process.env,
-      PYTHONPATH: "/python_libs",
-      PYTHONUNBUFFERED: "1"
-    };
-    pythonProcess = spawn("python3", [bridgePath], { env: pythonEnv });
+    pythonProcess = spawn("python3", [bridgePath]);
     
     pythonProcess.on("error", (err) => {
       console.error("[Python-Process-Fatal Error]", err);
-      try {
-        const libPath = path.join(__dirname, "backend", "python_lib");
-        if (fs.existsSync(libPath)) {
-          console.log("[Server] Conteúdo de python_lib:", fs.readdirSync(libPath).slice(0, 10).join(", "));
-        } else {
-          console.log("[Server] AVISO: Pasta python_lib não encontrada!");
-        }
-      } catch (e) {}
     });
 
     setupPythonListeners();

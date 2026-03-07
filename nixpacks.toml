@@ -1,18 +1,15 @@
 [phases.setup]
-nixPkgs = ["nodePackages.npm", "python3", "python3Packages.pip", "gcc", "gnumake", "openssl"]
+nixPkgs = ["nodePackages.npm", "python312", "python312Packages.pip", "gcc", "gnumake", "openssl"]
 
 [phases.install]
 cmds = [
     "npm install",
-    "python3 -m pip install --upgrade pip setuptools wheel",
-    "mkdir -p /python_libs",
-    "python3 -m pip install --no-cache-dir --target /python_libs -r requirements.txt"
+    "pip install --no-cache-dir -r backend/requirements.txt"
 ]
 
 [phases.build]
 cmds = [
-    "npm run build",
-    "PYTHONPATH=/python_libs python3 -c 'import urllib3; import iqoptionapi; print(\"System Libs Verified\")'"
+    "npm run build"
 ]
 
 [start]
