@@ -37,7 +37,7 @@ function startPython() {
 
   console.log(`[Server] Iniciando Python: ${bridgePath}`);
 
-  pythonProcess = spawn("python3", [bridgePath], {
+  pythonProcess = spawn("python", [bridgePath], {
     stdio: ["pipe", "pipe", "pipe"]
   });
 
