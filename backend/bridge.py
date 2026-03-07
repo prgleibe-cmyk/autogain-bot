@@ -4,7 +4,6 @@ import threading
 import warnings
 import urllib3
 
-# Redirecionamento de logs para não quebrar o JSON
 _real_stdout = sys.stdout
 sys.stdout = sys.stderr
 
@@ -24,7 +23,6 @@ class BridgeController:
         self.executor = OrderExecutor(self.connection, self.market)
         self.current_broker = "IQ Option"
         
-        # 🔒 CONTROLE ABSOLUTO DE ORDEM ÚNICA
         self.order_lock = threading.Lock()
         self.order_in_progress = False
 
@@ -86,6 +84,7 @@ class BridgeController:
                         })
 
                 elif msg_type in ['DATA', 'MARKET_DATA', 'GET_MARKET_DATA']:
+
                     def _async_data_fetch(r_id, d):
                         if self.connection.ensure_connection():
                             results = self.market.fetch_batch_data(
@@ -104,7 +103,7 @@ class BridgeController:
                                 "data": {},
                                 "error": "Offline"
                             })
-                    
+
                     threading.Thread(target=_async_data_fetch, args=(req_id, data), daemon=True).start()
 
                 elif msg_type in ['BUY', 'binary', 'ORDER']:
@@ -131,8 +130,8 @@ class BridgeController:
                         daemon=True
                     ).start()
 
-                # 🔥 CORREÇÃO CRÍTICA AQUI
                 elif msg_type == 'BALANCE':
+
                     try:
                         if not self.connection.ensure_connection():
                             self._send({

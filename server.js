@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import { spawn } from "child_process";
 import path from "path";
-import fs from "fs";
 import { fileURLToPath } from "url";
 import { Server } from "socket.io";
 import { createServer } from "http";
@@ -12,21 +11,15 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
+
 const io = new Server(httpServer, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  },
-  pingInterval: 25000,
-  pingTimeout: 60000,
-  transports: ["websocket"],
-  reconnection: true
+  cors: { origin: "*", methods: ["GET", "POST"] },
+  transports: ["websocket"]
 });
 
 app.use(cors());
 app.use(express.json());
 
-// Servir arquivos estáticos do frontend (Vite build)
 const distPath = path.join(__dirname, "dist");
 app.use(express.static(distPath));
 
@@ -39,105 +32,109 @@ let stdoutBuffer = "";
 /* ============================= */
 
 function startPython() {
+
   const bridgePath = path.join(__dirname, "backend", "bridge.py");
-  
-  stdoutBuffer = "";
-  pendingRequests.forEach(({ timeout, reject }) => {
-    clearTimeout(timeout);
-    reject(new Error("Python process restarted"));
+
+  console.log(`[Server] Iniciando Python: ${bridgePath}`);
+
+  pythonProcess = spawn("python3", [bridgePath], {
+    stdio: ["pipe", "pipe", "pipe"]
   });
-  pendingRequests.clear();
 
-  console.log(`[Server] Tentando iniciar Bridge Python em: ${bridgePath}`);
-  
-  try {
-    console.log("[Server] Iniciando com python3 global...");
-    pythonProcess = spawn("python3", [bridgePath]);
-    
-    pythonProcess.on("error", (err) => {
-      console.error("[Python-Process-Fatal Error]", err);
-    });
-
-    setupPythonListeners();
-  } catch (e) {
-    console.error("[Server] Erro crítico ao tentar iniciar Python:", e.message);
-  }
-}
-
-function setupPythonListeners() {
-  if (!pythonProcess) return;
+  pythonProcess.on("error", (err) => {
+    console.error("[Python Spawn Error]", err);
+  });
 
   pythonProcess.stdout.on("data", (data) => {
+
     stdoutBuffer += data.toString();
     const lines = stdoutBuffer.split("\n");
     stdoutBuffer = lines.pop();
 
     for (const line of lines) {
+
       if (!line.trim()) continue;
+
       try {
+
         const msg = JSON.parse(line);
+
         if (msg.request_id && pendingRequests.has(msg.request_id)) {
+
           const { resolve, timeout } = pendingRequests.get(msg.request_id);
+
           clearTimeout(timeout);
+
           pendingRequests.delete(msg.request_id);
+
           resolve(msg);
-        } 
+
+        }
+
         io.emit("stats_update", msg);
-      } catch (e) {
+
+      } catch {
+
         console.log("[Python Log]", line);
+
       }
+
     }
+
   });
 
   pythonProcess.stderr.on("data", (data) => {
-    console.error("[Python-Error]", data.toString());
+
+    console.error("[Python Error]", data.toString());
+
   });
 
   pythonProcess.on("close", (code) => {
-    console.log(`[Python] Encerrado (Code: ${code}). Reiniciando em 5s...`);
+
+    console.log(`[Python] Encerrado (Code ${code}). Reiniciando em 5s`);
+
     pythonProcess = null;
+
     setTimeout(startPython, 5000);
+
   });
+
 }
 
 startPython();
 
 /* ============================= */
-/* ENVIO PADRÃO PARA PYTHON      */
+/* COMUNICAÇÃO PYTHON            */
 /* ============================= */
 
 function sendToPython(command) {
+
   return new Promise((resolve, reject) => {
-    if (!pythonProcess || !pythonProcess.stdin || pythonProcess.killed) {
-      const status = !pythonProcess ? "null" : (pythonProcess.killed ? "killed" : "no-stdin");
-      return reject(new Error(`O motor do robô (Python) não está respondendo (Status: ${status}). Verifique os logs do servidor no Coolify.`));
+
+    if (!pythonProcess || pythonProcess.killed) {
+
+      return reject(new Error("Motor Python offline"));
+
     }
 
-    const request_id =
-      command.request_id ||
-      `${command.type}_${Date.now()}_${Math.random()
-        .toString(36)
-        .slice(2, 6)}`;
+    const request_id = `${command.type}_${Date.now()}`;
 
     command.request_id = request_id;
 
     const timeout = setTimeout(() => {
-      if (pendingRequests.has(request_id)) {
-        pendingRequests.delete(request_id);
-        reject(new Error(`Timeout Python (${request_id})`));
-      }
+
+      pendingRequests.delete(request_id);
+
+      reject(new Error("Timeout Python"));
+
     }, 120000);
 
     pendingRequests.set(request_id, { resolve, reject, timeout });
 
-    try {
-      pythonProcess.stdin.write(JSON.stringify(command) + "\n");
-    } catch (e) {
-      clearTimeout(timeout);
-      pendingRequests.delete(request_id);
-      reject(new Error(`Falha ao escrever no Python: ${e.message}`));
-    }
+    pythonProcess.stdin.write(JSON.stringify(command) + "\n");
+
   });
+
 }
 
 /* ============================= */
@@ -145,129 +142,78 @@ function sendToPython(command) {
 /* ============================= */
 
 app.post("/connect", async (req, res) => {
+
   try {
+
     const result = await sendToPython({
       type: "LOGIN",
       email: req.body.email,
       password: req.body.password,
-      type_acc: req.body.type || req.body.type_acc,
+      type_acc: req.body.type
     });
-    return res.json(result);
+
+    res.json(result);
+
   } catch (err) {
-    console.error("[Route /connect] Error:", err.message);
-    return res.status(500).json({ error: err.message });
+
+    console.error(err);
+
+    res.status(500).json({ error: err.message });
+
   }
+
 });
 
-/* 🔥 CORREÇÃO CRÍTICA AQUI */
-app.post("/buy", (req, res) => {
-  if (!pythonProcess || !pythonProcess.stdin || pythonProcess.killed) {
-    return res.status(500).json({ error: "Conexão com motor Python perdida." });
+app.post("/buy", async (req, res) => {
+
+  try {
+
+    const result = await sendToPython({
+      type: "ORDER",
+      asset: req.body.asset,
+      amount: req.body.amount,
+      action: req.body.action,
+      account_type: req.body.account_type
+    });
+
+    res.json(result);
+
+  } catch (err) {
+
+    res.status(500).json({ error: err.message });
+
   }
 
-  const request_id = `ORDER_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-
-  sendToPython({
-    request_id,
-    type: "ORDER",
-    asset: req.body.asset,
-    amount: Number(req.body.amount),
-    action: req.body.action,
-    account_type: req.body.account_type,
-  }).catch((err) => console.error("[Background Order Error]", err.message));
-
-  return res.json({
-    id: request_id,
-    status: "OPEN"
-  });
 });
 
 app.get("/balance", async (req, res) => {
+
   try {
+
     const result = await sendToPython({ type: "BALANCE" });
-    return res.json(result);
-  } catch (err) {
-    console.error("[Route GET /balance] Error:", err.message);
-    return res.status(500).json({ error: err.message });
-  }
-});
 
-app.post("/market_data", async (req, res) => {
-  try {
-    const result = await sendToPython({
-      type: "DATA",
-      assets: req.body.assets || [],
-    });
-    return res.json(result);
-  } catch (err) {
-    console.error("[Route POST /market_data] Error:", err.message);
-    return res.status(500).json({ error: err.message });
-  }
-});
+    res.json(result);
 
-app.get("/assets", async (req, res) => {
-  try {
-    const result = await sendToPython({ type: "GET_ASSETS" });
-    return res.json(result);
   } catch (err) {
-    console.error("[Route GET /assets] Error:", err.message);
-    return res.status(500).json({ error: err.message });
+
+    res.status(500).json({ error: err.message });
+
   }
+
 });
 
 app.get("/ping", (req, res) => res.json({ status: "online" }));
 
-app.post("/switch_account", async (req, res) => {
-  try {
-    const result = await sendToPython({
-      type: "SWITCH",
-      type_acc: req.body.type
-    });
-    return res.json(result);
-  } catch (err) {
-    console.error("[Route /switch_account] Error:", err.message);
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-io.on("connection", (socket) => {
-  console.log("[Socket] Novo cliente conectado:", socket.id);
-
-  socket.on("GET_MARKET_DATA", (data) => {
-    sendToPython({
-      type: "MARKET_DATA",
-      assets: data.assets || [],
-      request_id: data.request_id
-    }).catch((err) => console.error("[Socket GET_MARKET_DATA Error]", err.message));
-  });
-
-  socket.on("MARKET_DATA", (data) => {
-    sendToPython({
-      type: "MARKET_DATA",
-      assets: data.assets || [],
-      request_id: data.request_id
-    }).catch((err) => console.error("[Socket MARKET_DATA Error]", err.message));
-  });
-
-  socket.on("disconnect", () => {
-    console.log("[Socket] Cliente desconectado:", socket.id);
-  });
-});
-
-// Rota curinga para o SPA (Single Page Application)
 app.get("*", (req, res) => {
-  const indexPath = path.join(__dirname, "dist", "index.html");
-  res.sendFile(indexPath, (err) => {
-    if (err) {
-      console.error("[Server] Erro ao enviar index.html. O build foi feito? Caminho:", indexPath);
-      res.status(500).send("Erro interno: O frontend não foi construído corretamente. Verifique os logs do servidor.");
-    }
-  });
+
+  res.sendFile(path.join(distPath, "index.html"));
+
 });
 
 const PORT = process.env.PORT || 3000;
+
 httpServer.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Servidor rodando em http://0.0.0.0:${PORT}`);
-  console.log(`[Server] NODE_ENV: ${process.env.NODE_ENV}`);
-  console.log(`[Server] Servindo arquivos de: ${distPath}`);
+
+  console.log(`🚀 Server rodando na porta ${PORT}`);
+
 });

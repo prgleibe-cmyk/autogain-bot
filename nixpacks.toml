@@ -1,15 +1,22 @@
 [phases.setup]
-nixPkgs = ["nodePackages.npm", "python312", "python312Packages.pip", "gcc", "gnumake", "openssl"]
+nixPkgs = [
+  "nodejs",
+  "python312",
+  "python312Packages.pip",
+  "gcc",
+  "gnumake",
+  "openssl"
+]
 
 [phases.install]
 cmds = [
-    "npm install",
-    "pip install --no-cache-dir -r backend/requirements.txt"
+  "npm install",
+  "python3 -m pip install --no-cache-dir -r backend/requirements.txt"
 ]
 
 [phases.build]
 cmds = [
-    "npm run build"
+  "npm run build"
 ]
 
 [start]
