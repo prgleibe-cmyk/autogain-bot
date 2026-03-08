@@ -37,7 +37,7 @@ function installPythonDeps() {
 
     console.log("[Server] Instalando dependências Python...");
 
-    execSync("python -m pip install -r requirements.txt", {
+    execSync("python3 -m pip install -r requirements.txt", {
       stdio: "inherit",
       cwd: __dirname
     });
@@ -62,7 +62,7 @@ function startPython() {
 
   console.log(`[Server] Iniciando Python: ${bridgePath}`);
 
-  pythonProcess = spawn("python", [bridgePath], {
+  pythonProcess = spawn("python3", [bridgePath], {
     stdio: ["pipe", "pipe", "pipe"]
   });
 
