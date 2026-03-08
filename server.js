@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 import { Server } from "socket.io";
@@ -26,6 +26,31 @@ app.use(express.static(distPath));
 let pythonProcess = null;
 let pendingRequests = new Map();
 let stdoutBuffer = "";
+
+/* ============================= */
+/* INSTALAR DEPENDENCIAS PYTHON  */
+/* ============================= */
+
+function installPythonDeps() {
+
+  try {
+
+    console.log("[Server] Instalando dependências Python...");
+
+    execSync("python -m pip install -r requirements.txt", {
+      stdio: "inherit",
+      cwd: __dirname
+    });
+
+    console.log("[Server] Dependências Python OK");
+
+  } catch (err) {
+
+    console.error("[Server] Erro ao instalar dependências Python", err);
+
+  }
+
+}
 
 /* ============================= */
 /* INICIAR PYTHON                */
@@ -101,6 +126,11 @@ function startPython() {
 
 }
 
+/* ============================= */
+/* INICIALIZAÇÃO                 */
+/* ============================= */
+
+installPythonDeps();
 startPython();
 
 /* ============================= */
