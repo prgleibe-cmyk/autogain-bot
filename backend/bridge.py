@@ -14,40 +14,69 @@ from order_executor import OrderExecutor
 
 warnings.filterwarnings("ignore")
 
+
 class BridgeController:
+
     def __init__(self):
+
         self.connection = ConnectionManager()
         self.market = MarketDataService()
         self.account = AccountService(self.market)
         self.executor = OrderExecutor(self.connection, self.market)
+
         self.current_broker = "IQ Option"
 
         self.order_lock = threading.Lock()
         self.order_in_progress = False
 
     def _send(self, data):
+
         try:
+
             line = json.dumps(data) + "\n"
             _real_stdout.write(line)
             _real_stdout.flush()
+
         except Exception as e:
-            sys.stderr.write(f"Erro output: {e}\n")
+
+            sys.stderr.write(f"[Bridge] Erro output: {e}\n")
             sys.stderr.flush()
 
     def _safe_execute(self, req_id, data):
-        try:
+
+        with self.order_lock:
+
+            if self.order_in_progress:
+
+                self._send({
+                    "type": "ORDER_REJECTED",
+                    "request_id": req_id,
+                    "error": "Ordem já em execução"
+                })
+
+                return
+
             self.order_in_progress = True
+
+        try:
+
             self.executor.execute_order(req_id, data, self._send)
+
         except Exception as e:
-            sys.stderr.write(f"Erro execução ordem: {e}\n")
+
+            sys.stderr.write(f"[Bridge] Erro execução ordem: {e}\n")
             sys.stderr.flush()
+
             self._send({
                 "type": "ORDER_ERROR",
                 "request_id": req_id,
                 "error": "Erro interno na execução"
             })
+
         finally:
-            self.order_in_progress = False
+
+            with self.order_lock:
+                self.order_in_progress = False
 
     def run(self):
 
@@ -56,32 +85,41 @@ class BridgeController:
         while True:
 
             try:
+
                 line = sys.stdin.readline()
 
                 if not line:
-                    time.sleep(0.1)
+                    time.sleep(0.05)
                     continue
 
-                data = json.loads(line.strip())
-                req_id = data.get('request_id')
-                msg_type = data.get('type')
+                try:
+                    data = json.loads(line.strip())
+                except json.JSONDecodeError:
+                    sys.stderr.write("[Bridge] JSON inválido recebido\n")
+                    sys.stderr.flush()
+                    continue
 
-                if 'broker' in data:
-                    self.current_broker = data['broker']
+                req_id = data.get("request_id")
+                msg_type = data.get("type")
 
-                if msg_type == 'LOGIN':
+                if "broker" in data:
+                    self.current_broker = data["broker"]
+
+                # ---------------- LOGIN ----------------
+
+                if msg_type == "LOGIN":
 
                     self.connection.set_credentials(
-                        data.get('email'),
-                        data.get('password'),
-                        data.get('type_acc')
+                        data.get("email"),
+                        data.get("password"),
+                        data.get("type_acc")
                     )
 
                     if self.connection.ensure_connection():
 
                         try:
                             balance = self.account.get_balance(self.connection.api)
-                        except:
+                        except Exception:
                             balance = 0
 
                         self._send({
@@ -97,10 +135,12 @@ class BridgeController:
                         self._send({
                             "type": "LOGIN_ERROR",
                             "request_id": req_id,
-                            "error": "Credenciais Inválidas ou IP bloqueado."
+                            "error": "Credenciais inválidas ou IP bloqueado."
                         })
 
-                elif msg_type in ['DATA', 'MARKET_DATA', 'GET_MARKET_DATA']:
+                # ---------------- MARKET DATA ----------------
+
+                elif msg_type in ["DATA", "MARKET_DATA", "GET_MARKET_DATA"]:
 
                     def _async_data_fetch(r_id, d):
 
@@ -110,7 +150,7 @@ class BridgeController:
 
                                 results = self.market.fetch_batch_data(
                                     self.connection.api,
-                                    d.get('assets', [])
+                                    d.get("assets", [])
                                 )
 
                                 self._send({
@@ -130,7 +170,7 @@ class BridgeController:
 
                         except Exception as e:
 
-                            sys.stderr.write(f"Erro MARKET_DATA: {e}\n")
+                            sys.stderr.write(f"[Bridge] Erro MARKET_DATA: {e}\n")
                             sys.stderr.flush()
 
                             self._send({
@@ -146,17 +186,9 @@ class BridgeController:
                         daemon=True
                     ).start()
 
-                elif msg_type in ['BUY', 'binary', 'ORDER']:
+                # ---------------- ORDERS ----------------
 
-                    if self.order_in_progress:
-
-                        self._send({
-                            "type": "ORDER_REJECTED",
-                            "request_id": req_id,
-                            "error": "Ordem já em execução"
-                        })
-
-                        continue
+                elif msg_type in ["BUY", "binary", "ORDER"]:
 
                     if not self.connection.ensure_connection():
 
@@ -174,7 +206,9 @@ class BridgeController:
                         daemon=True
                     ).start()
 
-                elif msg_type == 'BALANCE':
+                # ---------------- BALANCE ----------------
+
+                elif msg_type == "BALANCE":
 
                     try:
 
@@ -199,7 +233,7 @@ class BridgeController:
 
                     except Exception as e:
 
-                        sys.stderr.write(f"Erro BALANCE: {e}\n")
+                        sys.stderr.write(f"[Bridge] Erro BALANCE: {e}\n")
                         sys.stderr.flush()
 
                         self._send({
@@ -209,7 +243,9 @@ class BridgeController:
                             "error": "Erro interno balance"
                         })
 
-                elif msg_type == 'GET_ASSETS':
+                # ---------------- GET ASSETS ----------------
+
+                elif msg_type == "GET_ASSETS":
 
                     self._send({
                         "type": "GET_ASSETS_RESULT",
@@ -217,10 +253,12 @@ class BridgeController:
                         "assets": self.account.get_available_assets()
                     })
 
-                elif msg_type == 'SWITCH':
+                # ---------------- SWITCH ACCOUNT ----------------
+
+                elif msg_type == "SWITCH":
 
                     success = self.connection.switch_account(
-                        data.get('type_acc', 'PRACTICE')
+                        data.get("type_acc", "PRACTICE")
                     )
 
                     self._send({
@@ -230,8 +268,10 @@ class BridgeController:
 
             except Exception as e:
 
-                sys.stderr.write(f"Erro processamento: {e}\n")
+                sys.stderr.write(f"[Bridge] Erro processamento: {e}\n")
                 sys.stderr.flush()
+                time.sleep(0.1)
+
 
 if __name__ == "__main__":
     BridgeController().run()
