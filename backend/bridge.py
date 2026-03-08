@@ -2,7 +2,6 @@ import sys
 import json
 import threading
 import warnings
-import urllib3
 import time
 
 _real_stdout = sys.stdout
@@ -13,7 +12,6 @@ from market_data_service import MarketDataService
 from account_service import AccountService
 from order_executor import OrderExecutor
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 warnings.filterwarnings("ignore")
 
 class BridgeController:
